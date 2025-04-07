@@ -92,8 +92,14 @@ jobs:
       shell: bash
       run: |
         cd build && ninja
+    - name: List build artifacts
+      shell: bash
+      run: find build -name 'aseprite*' -ls
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: aseprite
-        path: /Users/jiangxuhan/Documents/code/aseprite.exe
+        name: aseprite-${{ matrix.os }}-${{ matrix.build_type }}
+        path: |
+          build/bin/aseprite*
+          build/aseprite*
+          build/aseprite.app/**
