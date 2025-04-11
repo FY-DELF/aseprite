@@ -92,11 +92,27 @@ jobs:
       shell: bash
       run: |
         cd build && ninja
+    # 新增步骤：复制Skia库到构建目录
+    - name: Copy Skia Libraries
+      if: ${{ matrix.ui == 'gui' }}
+      shell: bash
+      run: |
+        case "${{ runner.os }}" in
+          macOS)
+            cp skia/out/Release-arm64/*.dylib build/bin/
+            ;;
+          Linux)
+            cp skia/out/Release-x64/*.so build/bin/
+            ;;
+          Windows)
+            cp skia/out/Release-x64/*.dll build/bin/
+            ;;
+        esac
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: aseprite-${{ matrix.os }}-${{ matrix.build_type }}
         path: |
-          build/bin/aseprite*
+          build/bin/**
           build/aseprite*
           build/aseprite.app/**
