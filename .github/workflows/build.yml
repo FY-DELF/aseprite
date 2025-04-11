@@ -38,18 +38,18 @@ jobs:
           wget https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Windows-Release-x64.zip
           unzip Skia-Windows-Release-x64.zip -d skia
         elif [[ "${{ runner.os }}" == "macOS" ]] ; then
-          # 动态检测架构
           ARCH=$(uname -m)
+          # 根据架构选择正确的 Skia 版本
           if [[ "$ARCH" == "arm64" ]]; then
             SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-arm64.zip"
-            SKIA_DIR="Release-arm64"
           else
             SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-x64.zip"
-            SKIA_DIR="Release-x64"
           fi
           wget $SKIA_URL
           unzip Skia-macOS-*.zip -d skia
-          ls -l skia/out/$SKIA_DIR/  # 验证路径
+          # 验证解压后的库文件路径
+          echo "=== Skia Library Files ==="
+          find skia -name "*.dylib"
         else
           wget https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Linux-Release-x64-libstdc++.zip
           unzip Skia-Linux-Release-x64-libstdc++.zip -d skia
