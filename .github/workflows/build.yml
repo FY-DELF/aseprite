@@ -33,22 +33,35 @@ jobs:
       if: ${{ matrix.ui == 'gui' }}
       shell: bash
       run: |
-        if [[ "${{ runner.os }}" == "macOS" ]] ; then
-          # 使用统一 macOS 版本（无论架构）
-          SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release.zip"
+        if [[ "${{ runner.os }}" == "macOS" ]]; then
+          # 检测真实架构（即使通过 Rosetta 运行）
+          ARCH=$(sysctl -n hw.optional.arm64 2>/dev/null)
+          if [[ "$ARCH" == "1" ]]; then
+            SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-arm64.zip"
+            SKIA_DIR="Release-arm64"
+          else
+            SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-x64.zip"
+            SKIA_DIR="Release-x64"
+          fi
           wget $SKIA_URL
-          unzip Skia-macOS-Release.zip -d skia
-          echo "=== Skia 库路径 ==="
-          ls -l skia/out/Release/*.dylib  # 验证路径
+          unzip Skia-macOS-*.zip -d skia
+          echo "=== Skia 库文件 ==="
+          ls -l skia/out/$SKIA_DIR/*.dylib
         fi
     - name: Copy Skia Libraries
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
       shell: bash
       run: |
-        echo "=== 复制 Skia 动态库 ==="
+        ARCH=$(sysctl -n hw.optional.arm64 2>/dev/null)
+        if [[ "$ARCH" == "1" ]]; then
+          SKIA_DIR="Release-arm64"
+        else
+          SKIA_DIR="Release-x64"
+        fi
+        echo "=== 复制路径: $SKIA_DIR ==="
         mkdir -p build/bin
-        cp -v skia/out/Release/*.dylib build/bin/
-        ls -l build/bin/*.dylib  # 确认复制成功
+        cp -v skia/out/$SKIA_DIR/*.dylib build/bin/
+        ls -l build/bin/*.dylib
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
       if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
