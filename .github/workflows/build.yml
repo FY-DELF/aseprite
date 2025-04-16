@@ -33,27 +33,22 @@ jobs:
       if: ${{ matrix.ui == 'gui' }}
       shell: bash
       run: |
-        if [[ "${{ runner.os }}" == "Windows" ]] ; then
-          choco install wget -y --no-progress
-          wget https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Windows-Release-x64.zip
-          unzip Skia-Windows-Release-x64.zip -d skia
-        elif [[ "${{ runner.os }}" == "macOS" ]] ; then
-          ARCH=$(uname -m)
-          # 根据架构选择正确的 Skia 版本
-          if [[ "$ARCH" == "arm64" ]]; then
-            SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-arm64.zip"
-          else
-            SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-x64.zip"
-          fi
+        if [[ "${{ runner.os }}" == "macOS" ]] ; then
+          # 使用统一 macOS 版本（无论架构）
+          SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release.zip"
           wget $SKIA_URL
-          unzip Skia-macOS-*.zip -d skia
-          # 验证解压后的库文件路径
-          echo "=== Skia Library Files ==="
-          find skia -name "*.dylib"
-        else
-          wget https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Linux-Release-x64-libstdc++.zip
-          unzip Skia-Linux-Release-x64-libstdc++.zip -d skia
+          unzip Skia-macOS-Release.zip -d skia
+          echo "=== Skia 库路径 ==="
+          ls -l skia/out/Release/*.dylib  # 验证路径
         fi
+    - name: Copy Skia Libraries
+      if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
+      shell: bash
+      run: |
+        echo "=== 复制 Skia 动态库 ==="
+        mkdir -p build/bin
+        cp -v skia/out/Release/*.dylib build/bin/
+        ls -l build/bin/*.dylib  # 确认复制成功
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
       if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
@@ -83,8 +78,9 @@ jobs:
           export enable_scripting=off
         fi
 
+        # 修正 Skia 路径定义
         if [[ "${{ runner.os }}" == "macOS" ]] ; then
-          export skia_arch=arm64
+          export skia_arch=Release
         else
           export skia_arch=x64
         fi
@@ -97,7 +93,7 @@ jobs:
           -DENABLE_CCACHE=$enable_ccache \
           -DLAF_BACKEND=$laf_backend \
           -DSKIA_DIR=skia \
-          -DSKIA_LIBRARY_DIR=skia/out/Release-$skia_arch
+          -DSKIA_LIBRARY_DIR=skia/out/$skia_arch
     - name: Compiling
       shell: bash
       run: |
