@@ -48,15 +48,30 @@ jobs:
           echo "=== 实际 Skia 库路径 ==="
           find skia -name "libskia.dylib"  # 定位主库文件
         fi
+    - name: Build Skia
+      if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
+      shell: bash
+      env:
+        SKIA_ARCH: "arm64"  # 或根据架构动态设置
+      run: |
+        git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+        export PATH="$PATH:$(pwd)/depot_tools"
+        
+        git clone https://github.com/aseprite/skia.git
+        cd skia
+        python tools/git-sync-deps
+        
+        bin/gn gen out/Release-$SKIA_ARCH --args='is_official_build=true is_debug=false target_cpu="$SKIA_ARCH"'
+        ninja -C out/Release-$SKIA_ARCH
+        
+        # 验证输出
+        ls -l out/Release-$SKIA_ARCH/*.dylib
     - name: Copy Skia Libraries
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
       shell: bash
       run: |
-        # 根据实际路径复制（假设库在 skia/out/Release）
-        echo "=== 复制路径: skia/third_party/externals ==="
         mkdir -p build/bin
-        cp -v skia/third_party/externals/*.dylib build/bin/
-        ls -l build/bin/*.dylib
+        cp -v skia/out/Release-$SKIA_ARCH/*.dylib build/bin/
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
       if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
@@ -88,9 +103,9 @@ jobs:
 
         # 修正 Skia 路径定义
         if [[ "${{ runner.os }}" == "macOS" ]]; then
-          export SKIA_LIB_DIR="skia/third_party/externals"  # 统一路径
+          export SKIA_LIB_DIR="skia/out/Release"  # 统一路径
         else
-          export SKIA_LIB_DIR="skia/third_party/externals-x64"
+          export SKIA_LIB_DIR="skia/out/Release-x64"
         fi
 
         cmake -S . -B build -G Ninja \
