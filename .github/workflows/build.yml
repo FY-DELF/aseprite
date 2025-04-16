@@ -53,9 +53,9 @@ jobs:
       shell: bash
       run: |
         # 根据实际路径复制（假设库在 skia/out/Release）
-        echo "=== 复制路径: skia/out/Release ==="
+        echo "=== 复制路径: skia/third_party/externals ==="
         mkdir -p build/bin
-        cp -v skia/out/Release/*.dylib build/bin/
+        cp -v skia/third_party/externals/*.dylib build/bin/
         ls -l build/bin/*.dylib
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
@@ -88,9 +88,9 @@ jobs:
 
         # 修正 Skia 路径定义
         if [[ "${{ runner.os }}" == "macOS" ]]; then
-          export SKIA_LIB_DIR="skia/out/Release"  # 统一路径
+          export SKIA_LIB_DIR="skia/third_party/externals"  # 统一路径
         else
-          export SKIA_LIB_DIR="skia/out/Release-x64"
+          export SKIA_LIB_DIR="skia/third_party/externals-x64"
         fi
 
         cmake -S . -B build -G Ninja \
