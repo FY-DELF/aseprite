@@ -34,33 +34,28 @@ jobs:
       shell: bash
       run: |
         if [[ "${{ runner.os }}" == "macOS" ]]; then
-          # 检测真实架构（即使通过 Rosetta 运行）
+          # 检测物理架构（非 Rosetta 模拟架构）
           ARCH=$(sysctl -n hw.optional.arm64 2>/dev/null)
           if [[ "$ARCH" == "1" ]]; then
             SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-arm64.zip"
-            SKIA_DIR="Release-arm64"
           else
             SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-x64.zip"
-            SKIA_DIR="Release-x64"
           fi
           wget $SKIA_URL
           unzip Skia-macOS-*.zip -d skia
-          echo "=== Skia 库文件 ==="
-          ls -l skia/out/$SKIA_DIR/*.dylib
+
+          # 输出实际库路径（关键调试信息）
+          echo "=== 实际 Skia 库路径 ==="
+          find skia -name "libskia.dylib"  # 定位主库文件
         fi
     - name: Copy Skia Libraries
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
       shell: bash
       run: |
-        ARCH=$(sysctl -n hw.optional.arm64 2>/dev/null)
-        if [[ "$ARCH" == "1" ]]; then
-          SKIA_DIR="Release-arm64"
-        else
-          SKIA_DIR="Release-x64"
-        fi
-        echo "=== 复制路径: $SKIA_DIR ==="
+        # 根据实际路径复制（假设库在 skia/out/Release）
+        echo "=== 复制路径: skia/out/Release ==="
         mkdir -p build/bin
-        cp -v skia/out/$SKIA_DIR/*.dylib build/bin/
+        cp -v skia/out/Release/*.dylib build/bin/
         ls -l build/bin/*.dylib
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
@@ -92,10 +87,10 @@ jobs:
         fi
 
         # 修正 Skia 路径定义
-        if [[ "${{ runner.os }}" == "macOS" ]] ; then
-          export skia_arch=Release
+        if [[ "${{ runner.os }}" == "macOS" ]]; then
+          export SKIA_LIB_DIR="skia/out/Release"  # 统一路径
         else
-          export skia_arch=x64
+          export SKIA_LIB_DIR="skia/out/Release-x64"
         fi
 
         cmake -S . -B build -G Ninja \
@@ -106,7 +101,7 @@ jobs:
           -DENABLE_CCACHE=$enable_ccache \
           -DLAF_BACKEND=$laf_backend \
           -DSKIA_DIR=skia \
-          -DSKIA_LIBRARY_DIR=skia/out/$skia_arch
+          -DSKIA_LIBRARY_DIR=$SKIA_LIB_DIR
     - name: Compiling
       shell: bash
       run: |
