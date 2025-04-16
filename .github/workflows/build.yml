@@ -29,25 +29,6 @@ jobs:
         sudo apt-get install -y \
           libpixman-1-dev libfreetype6-dev libharfbuzz-dev zlib1g-dev \
           libx11-dev libxcursor-dev libxi-dev libgl1-mesa-dev libfontconfig1-dev
-    - name: Install Skia
-      if: ${{ matrix.ui == 'gui' }}
-      shell: bash
-      run: |
-        if [[ "${{ runner.os }}" == "macOS" ]]; then
-          # 检测物理架构（非 Rosetta 模拟架构）
-          ARCH=$(sysctl -n hw.optional.arm64 2>/dev/null)
-          if [[ "$ARCH" == "1" ]]; then
-            SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-arm64.zip"
-          else
-            SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-x64.zip"
-          fi
-          wget $SKIA_URL
-          unzip Skia-macOS-*.zip -d skia
-
-          # 输出实际库路径（关键调试信息）
-          echo "=== 实际 Skia 库路径 ==="
-          find skia -name "libskia.dylib"  # 定位主库文件
-        fi
     - name: Build Skia
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
       shell: bash
