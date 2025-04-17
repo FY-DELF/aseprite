@@ -26,41 +26,45 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         brew update
-        brew install python git ninja
+        brew install python git ninja pkg-config libwebp libjpeg-turbo harfbuzz freetype
+        sudo xcode-select --install || true
         
     - name: Build Skia
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
       run: |
-        # 动态检测架构
         if [[ $(sysctl -n hw.optional.arm64) == "1" ]]; then
           SKIA_ARCH="arm64"
         else
           SKIA_ARCH="x64"
         fi
-
-        echo "=== 编译 Skia (架构: $SKIA_ARCH) ==="
-
-        # 克隆 depot_tools
+  
         git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
         export PATH="$PATH:$(pwd)/depot_tools"
-
-        # 克隆 Skia
+  
         git clone --depth 1 https://github.com/aseprite/skia.git
         cd skia
         python tools/git-sync-deps
-
-        # 生成构建配置（关键修复）
-        bin/gn gen out/Release-$SKIA_ARCH --args="is_official_build=true is_debug=false target_cpu=\"$SKIA_ARCH\""
+  
+        bin/gn gen out/Release-$SKIA_ARCH --args="
+          is_official_build=true
+          is_debug=false
+          target_cpu=\"$SKIA_ARCH\"
+          skia_use_system_libjpeg_turbo=true
+          skia_use_system_harfbuzz=true
+          skia_use_system_libwebp=true
+          skia_use_system_freetype2=true
+        "
+        ninja -C out/Release-$SKIA_ARCH -v
         
-        # 编译
-        ninja -C out/Release-$SKIA_ARCH
-
-        # 验证输出
-        ls -l out/Release-$SKIA_ARCH/*.dylib
     - name: Copy Skia Libraries
+      if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
       run: |
-        mkdir -p build/bin
-        cp -v skia/out/Release-$SKIA_ARCH/*.dylib build/bin/
+        if [[ $(sysctl -n hw.optional.arm64) == "1" ]]; then
+          SKIA_DIR="Release-arm64"
+        else
+          SKIA_DIR="Release-x64"
+        fi
+        cp -v skia/out/$SKIA_DIR/*.dylib build/bin/
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
@@ -70,32 +74,19 @@ jobs:
     - uses: aseprite/get-ninja@main
     - uses: ilammy/msvc-dev-cmd@v1
       if: runner.os == 'Windows'
+      
     - name: Generating Makefiles
       shell: bash
       run: |
-        if [[ "${{ runner.os }}" == "Windows" ]] ; then
-          export enable_ccache=off
-        else
-          export enable_ccache=on
-        fi
-
-        if [[ "${{ matrix.ui }}" == "gui" ]] ; then
-          export laf_backend=skia
-        else
-          export laf_backend=none
-        fi
-
-        if [[ "${{ matrix.scripting }}" == "lua" ]] ; then
-          export enable_scripting=on
-        else
-          export enable_scripting=off
-        fi
-
-        # 修正 Skia 路径定义
+        # 动态路径设置
         if [[ "${{ runner.os }}" == "macOS" ]]; then
-          export SKIA_LIB_DIR="skia/out/Release"  # 统一路径
+          if [[ $(sysctl -n hw.optional.arm64) == "1" ]]; then
+            SKIA_LIB_DIR="skia/out/Release-arm64"
+          else
+            SKIA_LIB_DIR="skia/out/Release-x64"
+          fi
         else
-          export SKIA_LIB_DIR="skia/out/Release-x64"
+          SKIA_LIB_DIR="skia/out/Release-x64"
         fi
 
         cmake -S . -B build -G Ninja \
