@@ -58,13 +58,17 @@ jobs:
         
     - name: Copy Skia Libraries
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
+      shell: bash
       run: |
         if [[ $(sysctl -n hw.optional.arm64) == "1" ]]; then
           SKIA_DIR="Release-arm64"
         else
           SKIA_DIR="Release-x64"
         fi
+        echo "=== Copying Skia Libraries from $SKIA_DIR ==="
+        mkdir -p build/bin
         cp -v skia/out/$SKIA_DIR/*.dylib build/bin/
+        ls -l build/bin/*.dylib
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
@@ -78,6 +82,19 @@ jobs:
     - name: Generating Makefiles
       shell: bash
       run: |
+        # 定义必要变量
+        if [[ "${{ matrix.ui }}" == "gui" ]]; then
+          export laf_backend=skia
+        else
+          export laf_backend=none
+        fi
+
+        if [[ "${{ matrix.scripting }}" == "lua" ]]; then
+          export enable_scripting=on
+        else
+          export enable_scripting=off
+        fi
+
         # 动态路径设置
         if [[ "${{ runner.os }}" == "macOS" ]]; then
           if [[ $(sysctl -n hw.optional.arm64) == "1" ]]; then
@@ -102,21 +119,7 @@ jobs:
       shell: bash
       run: |
         cd build && ninja
-    # 新增步骤：复制Skia库到构建目录
-    - name: Copy Skia Libraries
-      if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
-      shell: bash
-      run: |
-        ARCH=$(uname -m)
-        if [[ "$ARCH" == "arm64" ]]; then
-          SKIA_DIR="Release-arm64"
-        else
-          SKIA_DIR="Release-x64"
-        fi
-        echo "=== Copying Skia Libraries from $SKIA_DIR ==="
-        mkdir -p build/bin
-        cp -v skia/out/$SKIA_DIR/*.dylib build/bin/
-        ls -l build/bin/*.dylib
+
     - name: Fix RPATH (macOS)
       if: ${{ runner.os == 'macOS' }}
       run: |
