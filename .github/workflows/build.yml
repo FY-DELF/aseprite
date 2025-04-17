@@ -25,17 +25,23 @@ jobs:
     - name: Install Dependencies
       if: runner.os == 'macOS'
       run: |
-        brew cleanup
-        brew update-reset
+        # 1. 强制清理 Homebrew 环境
+        brew cleanup -s
         rm -rf $(brew --cache)
+        brew update-reset
         brew update
+
+        # 2. 仅安装核心依赖（禁止关联安装）
         brew install \
-          --ignore-dependencies \
-          --force-bottle \
+          --force-bottle \          # 强制使用预编译二进制
+          --ignore-dependencies \   # 跳过所有依赖检查
           python git ninja pkg-config \
           libwebp libjpeg-turbo harfbuzz freetype
-        sudo xcode-select --install || true
-        softwareupdate --all --install --force
+
+        # 3. 安装构建工具链
+        sudo rm -rf /Library/Developer/CommandLineTools
+        sudo xcode-select --install
+        sudo xcodebuild -license accept
         
     - name: Build Skia
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
