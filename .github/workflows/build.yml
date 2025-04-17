@@ -25,9 +25,17 @@ jobs:
     - name: Install Dependencies
       if: runner.os == 'macOS'
       run: |
+        brew cleanup
+        brew update-reset
+        rm -rf $(brew --cache)
         brew update
-        brew install python git ninja pkg-config libwebp libjpeg-turbo harfbuzz freetype
+        brew install \
+          --ignore-dependencies \
+          --force-bottle \
+          python git ninja pkg-config \
+          libwebp libjpeg-turbo harfbuzz freetype
         sudo xcode-select --install || true
+        softwareupdate --all --install --force
         
     - name: Build Skia
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
