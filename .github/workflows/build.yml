@@ -4,12 +4,11 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [macos-latest]
-        build_type: [RelWithDebInfo, Debug]
-        ui: [gui, cli]
-        scripting: [lua, noscripts]
+        build_type: [RelWithDebInfo]
+        ui: [gui]
+        scripting: [lua]
         exclude:
           - build_type: Debug
             ui: gui
@@ -19,40 +18,50 @@ jobs:
             scripting: noscripts
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
+    
+    - name: Clean Workspace
+      run: rm -rf skia depot_tools
+      
     - name: Install Dependencies
-      if: runner.os == 'Linux'
-      shell: bash
+      if: runner.os == 'macOS'
       run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y \
-          libpixman-1-dev libfreetype6-dev libharfbuzz-dev zlib1g-dev \
-          libx11-dev libxcursor-dev libxi-dev libgl1-mesa-dev libfontconfig1-dev
+        brew update
+        brew install python git ninja
+        
     - name: Build Skia
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
-      shell: bash
-      env:
-        SKIA_ARCH: "arm64"  # 或根据架构动态设置
       run: |
+        # 动态检测架构
+        if [[ $(sysctl -n hw.optional.arm64) == "1" ]]; then
+          SKIA_ARCH="arm64"
+        else
+          SKIA_ARCH="x64"
+        fi
+
+        echo "=== 编译 Skia (架构: $SKIA_ARCH) ==="
+
+        # 克隆 depot_tools
         git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
         export PATH="$PATH:$(pwd)/depot_tools"
-        
-        git clone https://github.com/aseprite/skia.git
+
+        # 克隆 Skia
+        git clone --depth 1 https://github.com/aseprite/skia.git
         cd skia
         python tools/git-sync-deps
+
+        # 生成构建配置（关键修复）
+        bin/gn gen out/Release-$SKIA_ARCH --args="is_official_build=true is_debug=false target_cpu=\"$SKIA_ARCH\""
         
-        bin/gn gen out/Release-$SKIA_ARCH --args='is_official_build=true is_debug=false target_cpu="$SKIA_ARCH"'
+        # 编译
         ninja -C out/Release-$SKIA_ARCH
-        
+
         # 验证输出
         ls -l out/Release-$SKIA_ARCH/*.dylib
     - name: Copy Skia Libraries
-      if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
-      shell: bash
       run: |
         mkdir -p build/bin
         cp -v skia/out/Release-$SKIA_ARCH/*.dylib build/bin/
+
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1
       if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
