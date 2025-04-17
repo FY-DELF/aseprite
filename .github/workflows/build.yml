@@ -25,26 +25,30 @@ jobs:
     - name: Install Dependencies
       if: runner.os == 'macOS'
       run: |
-        # 1. 强制清理 Homebrew 环境
-        brew cleanup -s
-        rm -rf $(brew --cache)
-        brew update-reset
-        brew update
-
-        # 2. 仅安装核心依赖（禁止关联安装）
+        # 创建隔离的 Homebrew 环境
+        export HOMEBREW_PREFIX="$(pwd)/.brew"
+        export PATH="$HOMEBREW_PREFIX/bin:$PATH"
+        git clone --depth=1 https://github.com/Homebrew/brew $HOMEBREW_PREFIX
+  
+        # 配置环境变量（禁止自动行为）
+        echo "HOMEBREW_NO_AUTO_UPDATE=1" >> $GITHUB_ENV
+        echo "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1" >> $GITHUB_ENV
+  
+        # 安装核心依赖（精确控制）
         brew install \
-          --force-bottle \          # 强制使用预编译二进制
-          --ignore-dependencies \   # 跳过所有依赖检查
+          --force-bottle \
+          --ignore-dependencies \
           python git ninja pkg-config \
           libwebp libjpeg-turbo harfbuzz freetype
-
-        # 3. 安装构建工具链
-        sudo rm -rf /Library/Developer/CommandLineTools
-        sudo xcode-select --install
-        sudo xcodebuild -license accept
+  
+        # 验证依赖完整性
+        ls -l $HOMEBREW_PREFIX/opt/libwebp/lib/libwebp.dylib
+        ls -l $HOMEBREW_PREFIX/opt/harfbuzz/lib/libharfbuzz.dylib
         
     - name: Build Skia
       if: ${{ matrix.ui == 'gui' && runner.os == 'macOS' }}
+      env:
+        PATH: "${{ github.workspace }}/.brew/bin:$PATH"  # 确保使用隔离环境
       run: |
         if [[ $(sysctl -n hw.optional.arm64) == "1" ]]; then
           SKIA_ARCH="arm64"
